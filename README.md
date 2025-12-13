@@ -37,10 +37,10 @@
 ## PM board and Slide Deck
 - [Project Management Board](https://www.notion.so/2c4bea2d956480f3b248ee6d00b69f3a?v=2c4bea2d9564808784c4000cc71a9540&source=copy_link)
 - [Slide Deck](https://docs.google.com/presentation/d/1q9BKlU-QY4dN1jVR5D0fCWjn0GbfX5mxRmK1R1gakGs/edit?usp=sharing)
-## Overview
 
-This project supports **NYC Vision Zero**, the city’s multi-agency initiative dedicated to eliminating traffic deaths and serious injuries. Using NYC’s Motor Vehicle Collision dataset, the project builds a predictive model that identifies conditions under which pedestrian injuries are most likely to occur. The tool is designed to inform safety interventions, enforcement prioritization, and data-driven street redesign strategies.
-
+## Overview and Key takeaway
+- This project supports **NYC Vision Zero**, the city’s multi-agency initiative dedicated to eliminating traffic deaths and serious injuries. Using NYC’s Motor Vehicle Collision dataset, the project builds a predictive model that identifies conditions under which pedestrian injuries are most likely to occur. The tool is designed to inform safety interventions, enforcement prioritization, and data-driven street redesign strategies.
+- Using NYC crash data, this project identifies that pedestrian injury risk is highest during the evening commute (4–6 PM), in Brooklyn and Queens, and in crashes involving sedans or SUVs. A calibrated logistic regression model captures these patterns and correctly flags approximately 84% of pedestrian-injury crashes, enabling Vision Zero to proactively target high-risk conditions rather than react after harm occurs.
 
 ## Stakeholder Context
 
