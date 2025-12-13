@@ -236,170 +236,125 @@ Pedestrian injuries are overwhelmingly driven by **preventable driver behaviors*
 
 This improved completeness and preserved valuable records.
 
+---------
+
+## Modeling Approach
+- **Key Takeaway:** Using a calibrated logistic regression model optimized for recall, we are able to correctly flag approximately 84% of pedestrian-injury crashes while maintaining an AUC of ~0.79, making the model well-suited for safety screening and early risk identification rather than punishment or individual prediction.
+
+### Why a Predictive Model Was Needed
+- Exploratory analysis revealed clear patterns in pedestrian injury risk by time of day, borough, vehicle type, and driver behavior, but Vision Zero decisions require more than descriptive trends. A predictive model allows us to combine these factors and estimate risk under specific conditions, such as:
+  - “If a crash occurs in Brooklyn during the evening commute involving a sedan and driver distraction, how likely is a pedestrian injury?”
+- Because pedestrian injuries are relatively rare (about 9% of crashes), the modeling challenge is not accuracy alone, but identifying high-risk cases without missing true injuries.
+
+### Models Evaluated
+- We tested three models of increasing complexity to balance interpretability, performance, and safety impact.
+
+#### Model A – Global Mean Baseline
+- What it does: Predicts the same injury probability for every crash equal to the dataset average (~9%).
+- Why it matters: This establishes a minimum performance benchmark. Any useful model must outperform this baseline.
+- Limitation: No ability to distinguish high-risk from low-risk situations.
+
+#### Model B – Simple Logistic Regression
+- Features used:
+  - `Hour of day`
+  - `Vehicle type`
+- What improved: This model captured basic temporal and vehicle-related risk patterns and outperformed the baseline.
+- Why it wasn’t enough: Recall remained limited, meaning too many pedestrian injury cases were missed. For a safety-critical application, this is unacceptable.
+
+
+#### Model C – Final Calibrated Logistic Regression (Selected Model)
+- This model was chosen because it provides the best balance between recall, interpretability, and responsible deployment.
+- Features Used:
+  - `cf1_clean` (primary contributing factor)
+  - `hour`
+  - `veh_group`
+  - `BoroName`
+- These features were selected because they:
+  - Are consistently available and reliable
+  - Show strong signal in exploratory analysis
+  - Align with real-world intervention levers (time, location, behavior, vehicle type)
+ 
+##### Model C's Pipeline
+  - StandardScaler applied to numeric features to normalize scale
+  - One-Hot Encoding for categorical features
+  - Logistic Regression with class weighting to address imbalance
+  - GridSearchCV used to tune the regularization parameter C, optimizing for recall
+  - Best-performing value: C = 3
+  - CalibratedClassifierCV (sigmoid) applied to correct probability distortion
+  - Final decision threshold set to 0.07 to prioritize safety
+
+##### Why Recall Was Prioritized
+- In this context, false negatives are more harmful than false positives.
+- A false negative means failing to flag a situation where a pedestrian injury is likely, potentially missing an opportunity for safety intervention.
+- A false positive may lead to extra attention or resources, which can be reviewed and adjusted by human decision-makers.
+  - Because of this, recall was chosen as the primary optimization metric.
+
+##### Model Performance (Test Set)
+- At a safety-optimized threshold of 0.07:
+  - Recall: ~0.84
+    - The model correctly identifies 84% of pedestrian-injury crashes
+  - Precision: ~0.16
+    - Many flagged cases will not result in injury, which is expected and acceptable for screening
+  - F1 Score: ~0.27
+    - Reflects the intentional tradeoff between recall and precision
+  - ROC-AUC: ~0.79
+    - Indicates strong overall ability to distinguish between injury and non-injury cases across thresholds
+  - Interpretation:
+    - The model is effective at ranking risk and identifying dangerous conditions, even when using a conservative threshold.
+
+##### Why Calibration Was Necessary
+- Before calibration, the model’s predicted probabilities were systematically misaligned with actual injury rates due to class imbalance. For example, a predicted probability of 0.30 did not correspond to a true 30% injury rate.
+- After calibration:
+  - Predicted probabilities became more realistic
+  - Threshold selection became meaningful
+  - Risk scores could be interpreted consistently across scenarios
+  - This step was essential for deploying the model as a decision-support tool rather than a black-box classifier.
+
+
+
+## Assumptions, Limitations, and Ethical Considerations
+- Key Assumptions:
+  - Historical crash patterns reflect near-term future risk
+  - Selected features capture meaningful signal
+  - The model is used to support, not replace, human judgment
+- Limitations:
+  - No roadway design, speed, weather, or lighting data
+  - Class imbalance increases false positives
+  - Relationships may shift over time (model drift)
+  - Predictions indicate correlation, not causation
+- Ethical Considerations
+  - Crash data reflects reporting and enforcement bias
+  - Over-prediction could reinforce inequitable enforcement
+  - False negatives could miss emerging risk areas
+- **The model is intended to guide safety design and planning, not punishment**
+- Core principle: The goal is to anticipate danger, not assign **blame.**
+
+## Connection to Business Question
+- The analysis directly answers: **“What factors increase the likelihood that a crash results in a pedestrian injury?”**
+- The model identifies clear risk drivers:
+  - High-risk times (evening commute)
+  - High-risk boroughs (Brooklyn, Queens)
+  - High-risk vehicle types (sedans, SUVs)
+  - High-risk behaviors (distraction, failure to yield)
+  - These insights support Vision Zero’s ability to prioritize interventions where they can have the greatest safety impact.
+- Future Work
+  - Add roadway geometry, speed limits, weather, lighting, and traffic volume
+  - Test tree-based and ensemble models
+  - Conduct formal fairness audits
+  - Retrain regularly with updated data
+  - Explore dynamic thresholds by time or location
+
+#### Streamlit App Overvie
+- What the App Does
+  - The app allows users to input crash conditions and returns:
+    - A calibrated injury probability
+    - A safety-focused risk classification
+    - A clear explanation of the decision threshold
+  - How to Use It
+    - Select crash details
+    - Click Predict
+    - Interpret the risk score as a screening signal
 
-
-# Modeling Approach
-
-## Overview
-
-Multiple models were developed to evaluate which crash characteristics predict pedestrian injuries, with recall prioritized due to the safety-critical nature of the problem.
-
-### Models Tested
-
-
-
-### **Model A – Global Mean Baseline**
-
-* Predicts injury probability equal to the dataset’s average (~9%)
-* Establishes benchmark MAE/MSE
-* No feature usage; only for comparison
-
-
-
-### **Model B – Simple Logistic Regression**
-
-Features:
-
-* `hour`
-* `veh_group` (one-hot encoded)
-
-Improved performance over baseline but limited recall.
-
-
-
-### **Model C – Final Calibrated Logistic Regression**
-
-**Features Used:**
-
-* `cf1_clean`
-* `hour`
-* `veh_group`
-* `BoroName`
-
-**Pipeline:**
-
-* StandardScaler for hour
-* One-hot encoding for categorical fields
-* LogisticRegression(max_iter=2000, class_weight='balanced')
-* GridSearchCV tuned `C ∈ {0.01, 0.1, 3, 5}` with scoring='recall'
-* Best `C = 3`
-* CalibratedClassifierCV (sigmoid, cv=3)
-* Decision threshold = **0.07** (safety-first)
-
-**Test Set Performance (threshold = 0.07):**
-
-* **Precision:** ~0.16
-* **Recall:** ~0.84
-* **F1:** ~0.27
-* **AUC:** ~0.79
-
-
-
-## What Is a Calibrated Model?
-
-Calibration adjusts raw model scores so predicted probabilities more accurately reflect true risk. The logistic regression model was poorly calibrated due to class imbalance. After calibration:
-
-* Probabilities became more realistic
-* Threshold selection became meaningful
-* Recall improved substantially
-
-This makes the model suitable for Vision Zero safety screening.
-
-
-
-# Assumptions, Limitations, and Ethical Considerations
-
-## Why Recall Was Prioritized
-
-Missing a true pedestrian-injury case is far more harmful than flagging a false positive.
-A recall of **0.84** reflects this safety-first approach.
-
-## Model Purpose and Assumptions
-
-* Designed as a **risk screening tool**, not a precision classifier
-* Uses four key features that carry reliable predictive signal
-* Assumes historical patterns reflect future risks
-
-## Key Limitations
-
-* Limited feature set (no speed limits, weather, road geometry, etc.)
-* Highly imbalanced data
-* Increased false positives due to low threshold
-* One-hot encoding reduces intuitive interpretability
-* Historical relationships may shift over time
-
-## Ethical Considerations
-
-* Avoid reinforcing policing disparities through over-prediction in certain areas
-* Ensure transparency: results guide planning, not enforcement penalties
-* Focus on systemic safety—not attributing blame to individuals
-
-
-
-# Connection to Business Question
-
-The analysis directly answers:
-
-**“What factors increase the likelihood that a crash results in a pedestrian injury?”**
-
-Results identify:
-
-* High-risk times (4–6 PM)
-* High-risk boroughs (Brooklyn, Queens)
-* High-risk vehicle types (sedans, SUVs)
-* High-risk behaviors (distraction, failing to yield)
-
-This supports:
-
-* Infrastructure planning
-* Enforcement strategy
-* Targeted safety campaigns
-* Risk-informed resource allocation
-
-
-
-# Future Work
-
-* Add roadway, weather, speed, lighting, and traffic volume features
-* Explore tree-based and boosting models
-* Conduct fairness and equity audits
-* Retrain with updated annual crash data
-* Implement time-varying thresholds or dynamic calibration
-* Add explainability tools (e.g., SHAP) for stakeholder transparency
-
-
-
-# Streamlit App Overview
-
-## What the App Does
-
-The Streamlit app enables users to input:
-
-* Primary contributing factor
-* Hour of day
-* Vehicle type
-* Borough
-
-The app returns:
-
-* A calibrated injury probability
-* A risk classification
-* A threshold explanation
-
-The interface is intentionally simple for non-technical users.
-
-## How to Use It
-
-1. Select crash conditions in the left sidebar
-2. Click **Predict**
-3. View:
-   * Injury probability
-   * High vs. low risk indicator
-4. Adjust inputs to explore different scenarios
-
-
-
----
 
 ## Project Structure
 
