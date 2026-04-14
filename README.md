@@ -236,7 +236,7 @@ Pedestrian injuries are overwhelmingly driven by **preventable driver behaviors*
 
 This improved completeness and preserved valuable records.
 
----------
+
 
 ## Modeling Approach
 - **Key Takeaway:** Using a calibrated logistic regression model optimized for recall, we are able to correctly flag approximately 84% of pedestrian-injury crashes while maintaining an AUC of ~0.79, making the model well-suited for safety screening and early risk identification rather than punishment or individual prediction.
@@ -370,7 +370,7 @@ This shifts the project from **reactive** (explaining what already happened) to 
 These two approaches are complementary, not competing. They operate at different scales and answer different questions.
  
 | | Logistic Regression (Original) | ARIMA Forecasting (Expansion) |
-|---|---|---|
+||||
 | **Question** | Will this crash injure a pedestrian? | How many injuries are expected next month? |
 | **Unit of analysis** | Individual crash event | Monthly aggregate count |
 | **Inputs** | Hour, borough, vehicle type, contributing factor | Historical injury time series + temporal features |
@@ -380,7 +380,7 @@ These two approaches are complementary, not competing. They operate at different
  
 > Think of the logistic regression as a **smoke detector** — it fires when a specific crash meets high-risk conditions. The ARIMA model is the **fire department's seasonal staffing plan** — it looks at historical patterns to anticipate when demand will be highest, before any individual incident occurs.
  
----
+
  
 ## Time Series Decomposition
  
@@ -393,7 +393,7 @@ Observed = Trend + Seasonality + Residual
 ```
  
 | Component | Definition | Stakeholder Use |
-|---|---|---|
+||||
 | **Trend** | Long-run direction after seasonal effects are removed | Track whether Vision Zero policies are producing measurable year-over-year improvement |
 | **Seasonality** | The repeating annual pattern — injuries that spike every summer regardless of trend | Pre-deploy traffic enforcement before the high-risk season arrives each year |
 | **Residual** | Unexplained variation left after trend and seasonality are removed | Evaluate whether a specific intervention worked, or flag external shocks like COVID-era traffic drops |
@@ -402,7 +402,7 @@ The decomposition also runs at the borough level, allowing stakeholders to see w
  
 **Output:** `Data/decomposed_injuries.csv`
  
----
+
  
 ## ARIMA Forecasting Model
  
@@ -420,14 +420,14 @@ An ARIMA (Autoregressive Integrated Moving Average) model is trained on historic
 **Model performance on held-out test year:**
  
 | Metric | What It Measures |
-|---|---|
+|||
 | **MAE** | Average absolute difference between predicted and actual injuries per month |
 | **RMSE** | Like MAE but penalizes large errors more heavily |
 | **MAPE** | Error as a percentage of actual values — useful for comparing across different time periods |
  
 **Output:** `Data/injury_forecast.csv`
  
----
+
  
 ## Temporal Feature Engineering
  
@@ -436,7 +436,7 @@ An ARIMA (Autoregressive Integrated Moving Average) model is trained on historic
 Raw timestamps are transformed into features that give any model a memory of the past — capturing momentum, volatility, and seasonal context that a single timestamp cannot convey.
  
 | Feature | Window | What It Captures |
-|---|---|---|
+||||
 | `lag_1` | 1 month | Short-term autocorrelation — bad months tend to cluster |
 | `lag_3` | 3 months | Medium-term carry-over |
 | `lag_12` | 12 months | Same month last year — strong seasonal memory signal |
@@ -450,7 +450,7 @@ Raw timestamps are transformed into features that give any model a memory of the
  
 **Output:** `Data/temporal_features.csv`
  
----
+
  
 ## Rebuilt Streamlit App
  
@@ -459,13 +459,16 @@ Raw timestamps are transformed into features that give any model a memory of the
 The original app has been rebuilt to incorporate all three new analytical layers alongside the scenario simulator, organized into four tabs:
  
 | Tab | Contents |
-|---|---|
+|||
 | ⚡ **Scenario Simulator** | Composite risk score across time of day, borough, and vehicle type with per-factor bar charts |
 | 📈 **Forecast** | ARIMA forecast chart, confidence interval, model performance metrics, and 12-month forecast table |
 | 🔍 **Decomposition** | Four-panel decomposition, monthly seasonal adjustment chart, trend summary, and anomaly flagging |
 | 🧩 **Temporal Features** | Lag correlation scatter plots, rolling mean overlay, year-over-year bar chart, and feature sample table |
  
----
+
+
+<img width="1450" height="828" alt="Screenshot 2026-04-14 at 11 02 35 AM" src="https://github.com/user-attachments/assets/b1697141-242f-428a-9381-d1ddd518a52c" />
+
  
 ## Assumptions, Limitations, and Ethical Considerations
 - Key Assumptions:
