@@ -355,6 +355,173 @@ This improved completeness and preserved valuable records.
     - Click Predict
     - Interpret the risk score as a screening signal
 
+# Project Expansion: Time Series Analysis & Forecasting
+ 
+## Why This Expansion
+ 
+The original model answers: *"Given these crash conditions, will a pedestrian be injured?"* It is powerful for scoring individual crashes but has no ability to look forward in time.
+ 
+The expansion addresses the next logical question Vision Zero stakeholders need answered: **"When will pedestrian risk increase, and by how much?"**
+ 
+This shifts the project from **reactive** (explaining what already happened) to **proactive** (anticipating what is about to happen), which is ultimately what a safety initiative requires to deploy resources ahead of harm.
+ 
+## How the Two Models Fit Together
+ 
+These two approaches are complementary, not competing. They operate at different scales and answer different questions.
+ 
+| | Logistic Regression (Original) | ARIMA Forecasting (Expansion) |
+|---|---|---|
+| **Question** | Will this crash injure a pedestrian? | How many injuries are expected next month? |
+| **Unit of analysis** | Individual crash event | Monthly aggregate count |
+| **Inputs** | Hour, borough, vehicle type, contributing factor | Historical injury time series + temporal features |
+| **Output** | Injury probability (0–1) | Predicted injury count with confidence interval |
+| **Time horizon** | Instantaneous | 6–18 months ahead |
+| **Best used for** | Real-time risk scoring | Annual safety planning and resource allocation |
+ 
+> Think of the logistic regression as a **smoke detector** — it fires when a specific crash meets high-risk conditions. The ARIMA model is the **fire department's seasonal staffing plan** — it looks at historical patterns to anticipate when demand will be highest, before any individual incident occurs.
+ 
+---
+ 
+## Time Series Decomposition
+ 
+**Notebook:** `notebooks/01_time_series_decomposition.ipynb`
+ 
+Monthly pedestrian injury counts are broken into three hidden components using an additive decomposition model:
+ 
+```
+Observed = Trend + Seasonality + Residual
+```
+ 
+| Component | Definition | Stakeholder Use |
+|---|---|---|
+| **Trend** | Long-run direction after seasonal effects are removed | Track whether Vision Zero policies are producing measurable year-over-year improvement |
+| **Seasonality** | The repeating annual pattern — injuries that spike every summer regardless of trend | Pre-deploy traffic enforcement before the high-risk season arrives each year |
+| **Residual** | Unexplained variation left after trend and seasonality are removed | Evaluate whether a specific intervention worked, or flag external shocks like COVID-era traffic drops |
+ 
+The decomposition also runs at the borough level, allowing stakeholders to see whether Brooklyn and Queens follow the same seasonal calendar or diverge — which has implications for where resources are deployed and when.
+ 
+**Output:** `Data/decomposed_injuries.csv`
+ 
+---
+ 
+## ARIMA Forecasting Model
+ 
+**Notebook:** `notebooks/02_forecasting_model.ipynb`
+ 
+An ARIMA (Autoregressive Integrated Moving Average) model is trained on historical monthly injury counts to produce short-term forecasts.
+ 
+**Model pipeline:**
+- Rolling baselines (3-month and 12-month averages) built first as interpretable benchmarks
+- Augmented Dickey-Fuller test checks whether the series is stationary; first-differencing applied if needed
+- ACF and PACF plots guide the selection of ARIMA p and q parameters
+- Model trained on all data except the last 12 months, held out for honest evaluation
+- Forward forecast generated for 6 to 18 months ahead with a 90% confidence interval
+ 
+**Model performance on held-out test year:**
+ 
+| Metric | What It Measures |
+|---|---|
+| **MAE** | Average absolute difference between predicted and actual injuries per month |
+| **RMSE** | Like MAE but penalizes large errors more heavily |
+| **MAPE** | Error as a percentage of actual values — useful for comparing across different time periods |
+ 
+**Output:** `Data/injury_forecast.csv`
+ 
+---
+ 
+## Temporal Feature Engineering
+ 
+**Notebook:** `notebooks/03_temporal_feature_engineering.ipynb`
+ 
+Raw timestamps are transformed into features that give any model a memory of the past — capturing momentum, volatility, and seasonal context that a single timestamp cannot convey.
+ 
+| Feature | Window | What It Captures |
+|---|---|---|
+| `lag_1` | 1 month | Short-term autocorrelation — bad months tend to cluster |
+| `lag_3` | 3 months | Medium-term carry-over |
+| `lag_12` | 12 months | Same month last year — strong seasonal memory signal |
+| `rolling_mean_3m` | 3 months | Short-term momentum direction |
+| `rolling_mean_6m` | 6 months | Medium-term trend, smoothed over monthly noise |
+| `rolling_std_3m` | 3 months | Recent volatility — is the situation unusually unstable? |
+| `yoy_pct_change` | 12 months | Is this year safer or more dangerous than last? |
+| `is_peak_season` | Jun–Oct | Binary flag for structurally high-risk summer and fall months |
+ 
+> **Note on data leakage:** All rolling and lag features use `shift(1)` before computing windows. This ensures only past data is used — no information about the current month leaks into features that describe it.
+ 
+**Output:** `Data/temporal_features.csv`
+ 
+---
+ 
+## Rebuilt Streamlit App
+ 
+**File:** `app/app2.py`
+ 
+The original app has been rebuilt to incorporate all three new analytical layers alongside the scenario simulator, organized into four tabs:
+ 
+| Tab | Contents |
+|---|---|
+| ⚡ **Scenario Simulator** | Composite risk score across time of day, borough, and vehicle type with per-factor bar charts |
+| 📈 **Forecast** | ARIMA forecast chart, confidence interval, model performance metrics, and 12-month forecast table |
+| 🔍 **Decomposition** | Four-panel decomposition, monthly seasonal adjustment chart, trend summary, and anomaly flagging |
+| 🧩 **Temporal Features** | Lag correlation scatter plots, rolling mean overlay, year-over-year bar chart, and feature sample table |
+ 
+---
+ 
+## Assumptions, Limitations, and Ethical Considerations
+- Key Assumptions:
+  - Historical crash patterns reflect near-term future risk
+  - Selected features capture meaningful signal
+  - The model is used to support, not replace, human judgment
+- Limitations:
+  - No roadway design, speed, weather, or lighting data
+  - Class imbalance increases false positives
+  - Relationships may shift over time (model drift)
+  - Predictions indicate correlation, not causation
+  - ARIMA is univariate — it does not incorporate external predictors like weather or enforcement activity
+  - Borough-level forecasting requires longer data histories to produce reliable results for smaller boroughs
+- Ethical Considerations
+  - Crash data reflects reporting and enforcement bias
+  - Over-prediction could reinforce inequitable enforcement
+  - False negatives could miss emerging risk areas
+- **The model is intended to guide safety design and planning, not punishment**
+- Core principle: The goal is to anticipate danger, not assign **blame.**
+ 
+## Connection to Business Question
+- The analysis directly answers: **"What factors increase the likelihood that a crash results in a pedestrian injury?"**
+- The model identifies clear risk drivers:
+  - High-risk times (evening commute)
+  - High-risk boroughs (Brooklyn, Queens)
+  - High-risk vehicle types (sedans, SUVs)
+  - High-risk behaviors (distraction, failure to yield)
+  - These insights support Vision Zero's ability to prioritize interventions where they can have the greatest safety impact.
+- The time series expansion extends this by identifying **when** risk is increasing, not just what conditions drive it — enabling Vision Zero to act before dangerous periods arrive rather than after.
+ 
+## Future Work
+- Add roadway geometry, speed limits, weather, lighting, and traffic volume
+- Test tree-based and ensemble models
+- Conduct formal fairness audits
+- Retrain regularly with updated data
+- Explore dynamic thresholds by time or location
+- **SARIMAX** — incorporate exogenous variables such as temperature, precipitation, and pedestrian volume into the forecasting model
+- **Prophet** — Meta's forecasting library handles holiday effects, missing data, and multiple seasonality cycles more gracefully than standard ARIMA
+- **Ensemble risk score** — combine the scenario-based injury probability with the time series forecasted count into a single composite signal
+ 
+## Streamlit App Overview
+ 
+### What the App Does
+The app allows users to explore crash risk across two dimensions:
+- **Scenario Simulator:** Input crash conditions and receive a calibrated injury risk score, a safety-focused risk classification, and a per-factor breakdown
+- **Forecast tab:** View the ARIMA forward forecast, confidence interval, and a 12-month prediction table
+- **Decomposition tab:** Explore trend, seasonality, and residual components of the injury time series
+- **Temporal Features tab:** Inspect lag correlations, rolling averages, and year-over-year change over time
+ 
+### How to Use It
+- Select crash details in the sidebar
+- Navigate tabs to switch between scenario scoring and time series views
+- Interpret the risk score as a screening signal, not a definitive prediction
+ 
+ 
+
 
 ## Project Structure
 
@@ -364,10 +531,14 @@ This improved completeness and preserved valuable records.
 │   ├── nybb_25d/
 │   ├── .gitignore
 │   └── Motor_Vehicle_Collisions_-_Crashes_20251209.csv
-│
+│   └── cleaned_crash_data.csv
+│   ├── decomposed_injuries.csv               ← NEW: trend/seasonality/residual components
+│   ├── temporal_features.csv                 ← NEW: lag + rolling features at monthly grain
+│   └── injury_forecast.csv                   ← NEW: 12-month ARIMA forecast with CI
 ├── app/
 │   ├── .venv/
 │   ├── app.py
+│   ├── app2.py
 │   └── calibrated_model.pkl
 │
 ├── images/
@@ -386,6 +557,9 @@ This improved completeness and preserved valuable records.
 ├── notebooks/
 │   ├── clean.ipynb
 │   └── eda.ipynb
+│   ├── 01_time_series_decomposition.ipynb    ← NEW: trend + seasonality + residual
+│   ├── 02_forecasting_model.ipynb            ← NEW: ARIMA forecasting
+│   └── 03_temporal_feature_engineering.ipynb ← NEW: lag + rolling features
 │
 ├── README.md
 └── requirements.txt
